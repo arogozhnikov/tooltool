@@ -1,0 +1,73 @@
+[build-system]
+requires = ["hatchling>=1.18.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tooltool"
+description = "Personal tools shared across projects"
+readme = "README.md"
+requires-python = ">=3.10"
+
+keywords = []
+classifiers = ['Programming Language :: Python :: 3']
+dependencies = [
+    # skip dependencies
+]
+dynamic = ["version"]
+authors = [{ name = 'Alex Rogozhnikov' }]
+
+[project.urls]
+Homepage = 'https://github.com/arogozhnikov/tooltool'
+
+[tool.hatch.version]
+path = "tooltool/__init__.py"
+
+[tool.hatch.envs.pypi.scripts]
+# hatch run pypi:deploy_test
+deploy_test = "hatch build --clean && hatch publish -r test"
+deploy = "hatch build --clean && hatch publish"
+
+
+
+[tool.black]
+line-length = 120
+target-version = ['py311']
+
+# this part is mirrored between repositories
+[tool.ruff]
+line-length = 120
+
+# this will be changed to true if there are useful auto-fixes available
+fix = true
+
+fixable = [
+     "I001", # isort-like sorting of imports
+]
+
+ignore = [
+    "E501", # line too long
+    "E731", # Do not assign a lambda expression
+    "C408", # rewrite dict as literal
+    "B023", # function definition does not bind loop variable
+    "RUF005", # rewrite concatenation with unpacking [*args, 1, 2, 3]. https://github.com/charliermarsh/ruff/issues/2142#issuecomment-1451038741
+]
+
+select = [
+    "E",  # standard
+    "F",  # standard
+    "I",  # isort
+    "A001", # variable shadows python built-in
+    "B",    # flake-bugbear, more advanced checks like non-mutable defaults
+    "C4",   # flake8-comprehensions
+    "RUF" , # ruff-specific
+    "RET501",  # do not use return None if it is the only value
+    "RET502" , # return None if can return anything else
+    "RET503" , # return None if can return anything else
+    "W605",    # invalid escape sequence
+]
+
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+]
