@@ -50,6 +50,7 @@ ignore = [
     "C408", # rewrite dict as literal
     "B023", # function definition does not bind loop variable
     "RUF005", # rewrite concatenation with unpacking [*args, 1, 2, 3]. https://github.com/charliermarsh/ruff/issues/2142#issuecomment-1451038741
+    "C413", # Unnecessary `list` call around `sorted()`
 ]
 
 select = [
