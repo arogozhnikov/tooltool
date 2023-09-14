@@ -88,7 +88,10 @@ class TrainCase:
             print(f"Nothing to delete, folder {path} does not exist")
             return
 
-        ask_confirmation(f"Do you want to delete {path=} ?", default="no")
+        if ask_confirmation(f"Do you want to delete {path=} ?", default="no"):
+            import shutil
+
+            shutil.rmtree(path=path)
 
     def backprop(self, loss):
         loss.backward()
