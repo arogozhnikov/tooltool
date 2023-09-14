@@ -2,7 +2,7 @@
 Train-case is a combination of model, optimizer, scheduler, logger.
 Only single-gpu case is supported.
 There can be multiple train-cases trained together.
-Auto-save and 'load the latest'
+Auto-save and 'load the latest' is also supported.
 
 Example usage:
 
@@ -17,10 +17,11 @@ for epoch in range(100):
         for batch_input, batch_output in data:
             batch_input, batch_output = case.to_device_all(batch_input, batch_output)
             train_loss = compute_loss(case.model(batch_input), batch_output)
-            case.backprop(loss) # backward + optim.step + optim.zero_grad
+            case.backprop(loss) # backward + optim.step + optim.zero_grad + increment step
             case.accumulate_until_collected('train_loss', train_loss)
             test_loss = ...
             case.accumulate_over_epoch('test_loss', test_loss)
+
 ```
 
 
@@ -31,12 +32,14 @@ import contextlib
 import dataclasses
 from collections import defaultdict
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.tensorboard import SummaryWriter
+
+from tooltool.ask_confirmation import ask_confirmation
 
 
 def _compute_mean(sum_and_count: list[tuple]) -> float:
@@ -49,17 +52,24 @@ def _compute_mean(sum_and_count: list[tuple]) -> float:
     return total_sum / total_count if total_count > 0 else np.nan
 
 
+def _sum_and_count(x: torch.Tensor, allow_multi: bool) -> tuple[float, int]:
+    count = x.nelement()
+    total = x.sum().item()
+    assert allow_multi or count == 1, count
+    return total, count
+
+
 @dataclasses.dataclass
 class TrainCase:
-    # what makes this name different from anything else? Be short and precise
+    # what makes this case different from anything else? Be short and precise
     name: str
     device: torch.device
     optimizer: torch.optim.Optimizer
     model: torch.nn.Module
-    writer: SummaryWriter
-    scheduler: torch.optim.lr_scheduler.LambdaLR = None
-    step: int = 1
-    epoch: int = 1
+    writer: Optional[SummaryWriter] = None
+    scheduler: torch.optim.lr_scheduler.LRScheduler = None
+    step: int = 0
+    epoch: int = 0
     auto_save_each_n_epochs: int = 20
 
     _epoch_accumulated_metrics = None
@@ -68,7 +78,17 @@ class TrainCase:
         self._accumulated_metrics = {}
         self._cache = {}
         assert " " not in self.name
+        if self.writer is None:
+            self.writer = SummaryWriter(log_dir=f"/data/logs_tb/{self.name}", flush_secs=40, comment=self.name)
         assert self.writer.log_dir.endswith(self.name), (self.name, self.writer.log_dir)
+
+    def delete_previous_attempt(self):
+        path = Path(self.writer.log_dir)
+        if not path.exists():
+            print(f"Nothing to delete, folder {path} does not exist")
+            return
+
+        ask_confirmation(f"Do you want to delete {path=} ?", default="no")
 
     def backprop(self, loss):
         loss.backward()
@@ -98,14 +118,17 @@ class TrainCase:
     def report_scalar(self, tag: str, value: Union[torch.Tensor, float]):
         self.writer.add_scalar(tag=tag, scalar_value=value, global_step=self.step)
 
-    def accumulate_until_collected(self, tag: str, value: torch.Tensor, max_collect=100):
-        self._accumulated_metrics.setdefault(tag, []).append(value.detach().cpu().item())
+    def add_text(self, tag: str, text_string: str):
+        self.writer.add_text(tag, text_string, global_step=self.step)
+
+    def accumulate_until_collected(self, tag: str, value: torch.Tensor, max_collect=100, allow_multi=False):
+        self._accumulated_metrics.setdefault(tag, []).append(_sum_and_count(value, allow_multi=allow_multi))
         if len(self._accumulated_metrics[tag]) >= max_collect:
-            self.report_scalar(tag, float(np.mean(self._accumulated_metrics[tag])))
+            self.report_scalar(tag, _compute_mean(self._accumulated_metrics[tag]))
             self._accumulated_metrics[tag] = []
 
-    def accumulate_over_epoch(self, tag: str, value: torch.Tensor):
-        self._epoch_accumulated_metrics.setdefault(tag, []).append(value.detach().cpu().item())
+    def accumulate_over_epoch(self, tag: str, value: torch.Tensor, allow_multi=False):
+        self._epoch_accumulated_metrics.setdefault(tag, []).append(_sum_and_count(value, allow_multi=allow_multi))
 
     def _checkpoint_folder(self) -> Path:
         return Path(self.writer.get_logdir()).joinpath("saved_models", self.name)
@@ -182,7 +205,7 @@ class TrainCase:
 
     def cache_get(self, keys: list) -> tuple:
         """
-        Retrieve a couple consisting of mask and a retrieved vector
+        Retrieve a couple consisting of mask and a retrieved vector.
         """
         mask = []
         result = []
