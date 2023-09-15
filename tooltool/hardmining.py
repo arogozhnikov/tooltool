@@ -37,8 +37,8 @@ class BinaryIndex:
 
     @staticmethod
     def _binarize(keys, components) -> torch.Tensor:
-        result = torch.zeros(len(keys), dtype=torch.int32, device=components.device)
-        for c in components:
+        result = torch.zeros(len(keys), dtype=torch.int32, device=keys.device)
+        for c in components.tolist():
             result <<= 1
             result |= keys[:, c] > 0
         return result
