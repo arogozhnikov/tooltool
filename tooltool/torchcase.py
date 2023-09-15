@@ -83,13 +83,16 @@ class TrainCase:
         self._cache = {}
         assert " " not in self.name
         if self.writer is None:
-            self.writer = SummaryWriter(log_dir=f"/data/logs_tb/{self.name}", flush_secs=40, comment=self.name)
+            log_dir = f"/data/logs_tb/{self.name}"
+            if Path(log_dir).exists():
+                warnings.warn(f"Folder already exists: {self._dir()}", stacklevel=3)
+                warnings.warn(
+                    "You may want to rename experiment or load checkpoint or clear previous work", stacklevel=3
+                )
+
+            self.writer = SummaryWriter(log_dir=log_dir, flush_secs=40, comment=self.name)
 
         assert str(self._dir()).endswith(self.name), (self.name, self.writer.log_dir)
-
-        if self._dir().exists():
-            warnings.warn(f"Folder already exists: {self._dir()}", stacklevel=3)
-            warnings.warn("You may want to rename experiment or load checkpoint or clear previous work", stacklevel=3)
 
     def delete_previous_attempt(self):
         path = Path(self.writer.log_dir)
