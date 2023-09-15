@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import warnings
 from collections import defaultdict
 from pathlib import Path
 from typing import Optional, Union
@@ -74,13 +75,21 @@ class TrainCase:
 
     _epoch_accumulated_metrics = None
 
+    def _dir(self) -> Path:
+        return Path(self.writer.log_dir)
+
     def __post_init__(self):
         self._accumulated_metrics = {}
         self._cache = {}
         assert " " not in self.name
         if self.writer is None:
             self.writer = SummaryWriter(log_dir=f"/data/logs_tb/{self.name}", flush_secs=40, comment=self.name)
-        assert self.writer.log_dir.endswith(self.name), (self.name, self.writer.log_dir)
+
+        assert str(self._dir()).endswith(self.name), (self.name, self.writer.log_dir)
+
+        if self._dir().exists():
+            warnings.warn(f"Folder already exists: {self._dir()}", stacklevel=3)
+            warnings.warn("You may want to rename experiment or load checkpoint or clear previous work", stacklevel=3)
 
     def delete_previous_attempt(self):
         path = Path(self.writer.log_dir)
