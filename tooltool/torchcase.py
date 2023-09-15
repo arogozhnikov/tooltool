@@ -85,7 +85,7 @@ class TrainCase:
         if self.writer is None:
             log_dir = f"/data/logs_tb/{self.name}"
             if Path(log_dir).exists():
-                warnings.warn(f"Folder already exists: {self._dir()}", stacklevel=3)
+                warnings.warn(f"Folder already exists: {log_dir}", stacklevel=3)
                 warnings.warn(
                     "You may want to rename experiment or load checkpoint or clear previous work", stacklevel=3
                 )
@@ -152,6 +152,7 @@ class TrainCase:
         path = self._checkpoint_folder().joinpath(f"{self.epoch:>05}.pth")
         path.parent.mkdir(exist_ok=True, parents=True)
         path = str(path.absolute())
+        # TODO this works only for jit-ted or script-ed models. Maybe use torch.save if this does not work
         torch.jit.save(self.model, path)
         return Path(path)
 
