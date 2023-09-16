@@ -94,7 +94,8 @@ class TrainCase:
 
         assert str(self._dir()).endswith(self.name), (self.name, self.writer.log_dir)
 
-    def delete_previous_attempt(self):
+    def delete_current_attempt(self):
+        assert self.writer is not None
         path = Path(self.writer.log_dir)
         if not path.exists():
             print(f"Nothing to delete, folder {path} does not exist")
@@ -104,6 +105,7 @@ class TrainCase:
             import shutil
 
             shutil.rmtree(path=path)
+            print("Deleted")
 
     def backprop(self, loss):
         loss.backward()
