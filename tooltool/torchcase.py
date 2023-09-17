@@ -197,6 +197,16 @@ class TrainCase:
             if case.epoch == 1 or case.epoch % case.auto_save_each_n_epochs == 0:
                 case.checkpoint_save()
 
+    @staticmethod
+    def _keys_to_list(keys):
+        if isinstance(keys, pd.Series):
+            keys = keys.values.tolist()
+        if isinstance(keys, np.ndarray):
+            keys = keys.tolist()
+        if isinstance(keys, torch.Tensor):
+            keys = keys.tolist()
+        return keys
+
     def cache_set(self, keys, values: torch.Tensor, contribution=1.0):
         """
         Cache allows accumulating some information with exponential weighting so
@@ -207,10 +217,7 @@ class TrainCase:
         Keys is 1-dim iterable that correspond to the first dimension of values tensor.
         """
         assert 0 < contribution <= 1
-        if isinstance(keys, pd.Series):
-            keys = keys.values.tolist()
-        if isinstance(keys, np.ndarray):
-            keys = keys.tolist()
+        keys = TrainCase._keys_to_list(keys)
 
         if isinstance(values, torch.Tensor):
             values = self.as_numpy(values)
@@ -227,6 +234,7 @@ class TrainCase:
         """
         mask = []
         result = []
+        keys = TrainCase._keys_to_list(keys)
         for key in keys:
             if key in self._cache:
                 result.append(self._cache[key])
@@ -234,6 +242,6 @@ class TrainCase:
             else:
                 mask.append(False)
         if len(result) == 0:
-            # special case
+            # special case. Maybe throw an exception?
             return None, None
         return self.to_device(np.stack(result)), self.to_device(np.asarray(mask, dtype="bool"))
